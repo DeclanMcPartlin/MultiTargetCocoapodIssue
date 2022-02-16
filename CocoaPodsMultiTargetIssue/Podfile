@@ -1,0 +1,218 @@
+
+source 'https://cdn.cocoapods.org/'
+platform :ios, '10.0'
+
+target 'TargetB' do
+  pod 'Protobuf'
+  pod 'AdColony'
+  pod 'Google-Mobile-Ads-SDK'
+  pod 'AppLovinSDK'
+  pod 'FBAudienceNetwork'
+  pod 'IronSourceSDK'
+  pod 'UnityAds'
+  pod 'VungleSDK-iOS'
+end
+
+target 'TargetA' do
+end
+
+use_frameworks!
+
+post_install do |installer|
+     applicationTargets = [
+         'Pods-TargetA',
+     ]
+     libraryTargets = [
+         'Pods-TargetB',
+     ]
+
+     embedded_targets = installer.aggregate_targets.select { |aggregate_target|
+         libraryTargets.include? aggregate_target.name
+     }
+     embedded_pod_targets = embedded_targets.flat_map { |embedded_target| embedded_target.pod_targets }
+     host_targets = installer.aggregate_targets.select { |aggregate_target|
+         applicationTargets.include? aggregate_target.name
+     }
+
+     # We only want to remove pods from Application targets, not libraries
+     host_targets.each do |host_target|
+         host_target.xcconfigs.each do |config_name, config_file|
+             host_target.pod_targets.each do |pod_target|
+                 if embedded_pod_targets.include? pod_target
+                     pod_target.specs.each do |spec|
+                         if spec.attributes_hash['ios'] != nil
+                             frameworkPaths = spec.attributes_hash['ios']['vendored_frameworks']
+                             else
+                             frameworkPaths = spec.attributes_hash['vendored_frameworks']
+                         end
+                         if frameworkPaths != nil
+                             frameworkNames = Array(frameworkPaths).map(&:to_s).map do |filename|
+                                 extension = File.extname filename
+                                 File.basename filename, extension
+                             end
+                             frameworkNames.each do |name|
+                                 puts "Removing #{name} from OTHER_LDFLAGS of target #{host_target.name}"
+                                 config_file.frameworks.delete(name)
+                             end
+                         end
+                     end
+                 end
+             end
+             xcconfig_path = host_target.xcconfig_path(config_name)
+             config_file.save_as(xcconfig_path)
+         end
+     end
+ end
+
+
+
+
+
+
+
+
+#Solutions
+
+### Static, both targets:
+
+#source 'https://cdn.cocoapods.org/'
+#platform :ios, '10.0'
+#
+#target 'TargetB' do
+#  pod 'Protobuf'
+#  pod 'AdColony'
+#  pod 'Google-Mobile-Ads-SDK'
+#  pod 'AppLovinSDK'
+#  pod 'FBAudienceNetwork'
+#  pod 'IronSourceSDK'
+#  pod 'UnityAds'
+#  pod 'VungleSDK-iOS'
+#end
+#
+#target 'TargetA' do
+#end
+
+
+#Result
+#ld: library not found for -lGoogleUtilities
+
+
+### Dynamic, both targets
+
+#source 'https://cdn.cocoapods.org/'
+#platform :ios, '10.0'
+#
+#target 'TargetB' do
+#  pod 'Protobuf'
+#  pod 'AdColony'
+#  pod 'Google-Mobile-Ads-SDK'
+#  pod 'AppLovinSDK'
+#  pod 'FBAudienceNetwork'
+#  pod 'IronSourceSDK'
+#  pod 'UnityAds'
+#  pod 'VungleSDK-iOS'
+#end
+#
+#target 'TargetA' do
+#end
+
+#use_frameworks!
+
+#Result
+#objc[4056]: Class ADCClickOverride is implemented in both /private/var/containers/Bundle/Application/FF0023B5-B3EC-4E0D-B4E7-65D5B08A73D9/TargetA.app/Frameworks/TargetB.framework/TargetB (0x106c447c0) and /private/var/containers/Bundle/Application/FF0023B5-B3EC-4E0D-B4E7-65D5B08A73D9/TargetA.app/TargetA (0x1054ba698). One of the two will be used. Which one is undefined.
+#Repeats for each class, long list.
+
+
+
+### Dynamic, TargetB
+
+#source 'https://cdn.cocoapods.org/'
+#platform :ios, '10.0'
+#
+#target 'TargetB' do
+#  pod 'Protobuf'
+#  pod 'AdColony'
+#  pod 'Google-Mobile-Ads-SDK'
+#  pod 'AppLovinSDK'
+#  pod 'FBAudienceNetwork'
+#  pod 'IronSourceSDK'
+#  pod 'UnityAds'
+#  pod 'VungleSDK-iOS'
+#end
+#
+#use_frameworks!
+
+#Result
+#dyld: Library not loaded: @rpath/FBLPromises.framework/FBLPromises
+#Referenced from: /private/var/containers/Bundle/Application/5EE50533-764A-45C6-B193-D759441A3DF2/TargetA.app/Frameworks/TargetB.framework/TargetB
+#Reason: image not found
+
+
+
+
+# Working solution
+
+#source 'https://cdn.cocoapods.org/'
+#platform :ios, '10.0'
+#
+#target 'TargetB' do
+#  pod 'Protobuf'
+#  pod 'AdColony'
+#  pod 'Google-Mobile-Ads-SDK'
+#  pod 'AppLovinSDK'
+#  pod 'FBAudienceNetwork'
+#  pod 'IronSourceSDK'
+#  pod 'UnityAds'
+#  pod 'VungleSDK-iOS'
+#end
+#
+#target 'TargetA' do
+#end
+#
+#use_frameworks!
+#
+#post_install do |installer|
+#     applicationTargets = [
+#         'Pods-TargetA',
+#     ]
+#     libraryTargets = [
+#         'Pods-TargetB',
+#     ]
+#
+#     embedded_targets = installer.aggregate_targets.select { |aggregate_target|
+#         libraryTargets.include? aggregate_target.name
+#     }
+#     embedded_pod_targets = embedded_targets.flat_map { |embedded_target| embedded_target.pod_targets }
+#     host_targets = installer.aggregate_targets.select { |aggregate_target|
+#         applicationTargets.include? aggregate_target.name
+#     }
+#
+#     # We only want to remove pods from Application targets, not libraries
+#     host_targets.each do |host_target|
+#         host_target.xcconfigs.each do |config_name, config_file|
+#             host_target.pod_targets.each do |pod_target|
+#                 if embedded_pod_targets.include? pod_target
+#                     pod_target.specs.each do |spec|
+#                         if spec.attributes_hash['ios'] != nil
+#                             frameworkPaths = spec.attributes_hash['ios']['vendored_frameworks']
+#                             else
+#                             frameworkPaths = spec.attributes_hash['vendored_frameworks']
+#                         end
+#                         if frameworkPaths != nil
+#                             frameworkNames = Array(frameworkPaths).map(&:to_s).map do |filename|
+#                                 extension = File.extname filename
+#                                 File.basename filename, extension
+#                             end
+#                             frameworkNames.each do |name|
+#                                 puts "Removing #{name} from OTHER_LDFLAGS of target #{host_target.name}"
+#                                 config_file.frameworks.delete(name)
+#                             end
+#                         end
+#                     end
+#                 end
+#             end
+#             xcconfig_path = host_target.xcconfig_path(config_name)
+#             config_file.save_as(xcconfig_path)
+#         end
+#     end
+# end
